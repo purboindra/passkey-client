@@ -24,9 +24,11 @@ import kotlinx.serialization.json.Json
 @Serializable
 data class RegistrationResponse(val message: String, val data: OptionsDataClass)
 
+@Serializable
+data class UserResponse(val name: String, val age: Int)
+
 val URL: String
-    //    get() = "http://192.168.1.7:3000"
-    get() = "http://10.0.2.2:3000"
+    get() = "https://passkey-server-production.up.railway.app"
 
 class LoginViewModel : ViewModel() {
     val client = HttpClient(CIO) {
@@ -43,9 +45,7 @@ class LoginViewModel : ViewModel() {
     val loading: StateFlow<Boolean> = _loading.asStateFlow()
     
     suspend fun fetchRegistrationOptions(): OptionsDataClass? {
-        Log.d("LoginViewModel", "Fetching registration options...")
         try {
-            
             _loading.value = true
             
             val httpResponse =
@@ -75,6 +75,8 @@ class LoginViewModel : ViewModel() {
         } catch (e: Exception) {
             Log.e("LoginViewModel", "Error fetching registration options", e)
             return null
+        } finally {
+            _loading.value = false
         }
     }
     
