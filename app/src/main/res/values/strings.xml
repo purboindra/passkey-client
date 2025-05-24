@@ -1,3 +1,10 @@
 <resources>
     <string name="app_name">Safer Auth</string>
+
+    <string name="asset_statements" translatable="false">
+  [{
+    "include": "https://passkey-server-production.up.railway.app/.well-known/assetlinks.json"
+  }]
+</string>
+
 </resources>
