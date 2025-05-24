@@ -7,7 +7,7 @@ plugins {
 
 val ktor_version: String by project
 val logback_version: String by project
-
+val key_alias: String by project
 
 android {
     namespace = "com.purboyndradev.saferauth"
@@ -23,9 +23,23 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     
+    signingConfigs {
+        create("release") {
+            storeFile = file("/Users/purboindra/keystore/safer_auth_release.jks")
+            storePassword = "purboyndra53"
+            keyAlias = key_alias
+            keyPassword = "purboyndra53"
+        }
+    }
+    
     buildTypes {
-        release {
-            isMinifyEnabled = false
+//        release {
+//            isMinifyEnabled = false
+//            signingConfig = signingConfigs.release
+//        }
+        
+        getByName("release") {
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
