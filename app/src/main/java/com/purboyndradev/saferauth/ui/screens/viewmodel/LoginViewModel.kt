@@ -12,7 +12,14 @@ import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.plugins.cookies.AcceptAllCookiesStorage
+import io.ktor.client.plugins.cookies.HttpCookies
 import io.ktor.client.request.get
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.client.statement.HttpResponse
+import io.ktor.http.ContentType
+import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,6 +27,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import java.net.HttpCookie
 
 @Serializable
 data class RegistrationResponse(val message: String, val data: OptionsDataClass)
@@ -27,12 +35,48 @@ data class RegistrationResponse(val message: String, val data: OptionsDataClass)
 @Serializable
 data class UserResponse(val name: String, val age: Int)
 
+@Serializable
+data class CredProps(
+    val rk: Boolean,
+)
+
+@Serializable
+data class ClientExtensionResult(
+    val credProps: CredProps
+)
+
+@Serializable
+data class VerifyResponseBody(
+    val clientDataJSON: String,
+    val attestationObject: String,
+    val transports: List<String>,
+    val authenticatorData: String,
+    val publicKeyAlgorithm: Int,
+    val publicKey: String,
+)
+
+@Serializable
+data class VerifyBody(
+    val rawId: String,
+    val authenticatorAttachment: String,
+    val type: String,
+    val id: String,
+    val response: VerifyResponseBody,
+    val clientExtensionResults: ClientExtensionResult,
+)
+
+class PasskeyCreationException(message: String, cause: Throwable? = null) :
+    Exception(message, cause)
+
 val URL: String
     get() = "https://passkey-server-production.up.railway.app"
 
 class LoginViewModel : ViewModel() {
     val client = HttpClient(CIO) {
         expectSuccess = true
+        install(HttpCookies) {
+            storage = AcceptAllCookiesStorage()
+        }
         install(ContentNegotiation) {
             json(Json {
                 prettyPrint = true
@@ -80,6 +124,33 @@ class LoginViewModel : ViewModel() {
         }
     }
     
+    suspend fun verifyRegistrationOptions(body: String): Boolean {
+        try {
+            
+            Log.d("LoginViewModel", "Verifying registration options: $body")
+            
+            val verifyBody = Json.decodeFromString<VerifyBody>(body)
+            
+            Log.d("LoginViewModel", "Verify body: $verifyBody")
+            
+            val httpResponse: HttpResponse =
+                client.post("$URL/auth/verify-registration-options") {
+                    contentType(ContentType.Application.Json)
+                    setBody(verifyBody)
+                }
+            
+            
+            if (httpResponse.status.value != 200) {
+                throw Exception(httpResponse.status.description)
+            }
+            
+            return true
+        } catch (e: Throwable) {
+            Log.e("LoginViewModel", "Error verifying registration options", e)
+            return false
+        }
+    }
+    
     @SuppressLint("PublicKeyCredential")
     fun createPasskey(
         preferImmediatelyAvailableCredentials: Boolean,
@@ -111,7 +182,6 @@ class LoginViewModel : ViewModel() {
                 "Creating passkey with request: $createPublicKeyCredentialRequest, modifyJson: $modifyJson"
             )
             
-            
             try {
                 val result =
                     appCredentialManager.credentialManager.createCredential(
@@ -119,10 +189,42 @@ class LoginViewModel : ViewModel() {
                         request = createPublicKeyCredentialRequest
                     )
                 
-                Log.d("LoginViewModel", "Passkey created: $result")
+                val credentialJson =
+                    result.data.getString("androidx.credentials.BUNDLE_KEY_REGISTRATION_RESPONSE_JSON")
                 
-            } catch (e: Throwable) {
-                Log.e("LoginViewModel", "Error creating passkey", e)
+                Log.d(
+                    "LoginViewModel",
+                    "Passkey created credentialJson: $credentialJson"
+                )
+                
+                val nonNullCredentialJson = credentialJson
+                    ?: throw PasskeyCreationException("Credential JSON is null, cannot proceed with passkey creation")
+                
+                Log.d(
+                    "LoginViewModel",
+                    "Successfully obtained credential JSON, proceeding with passkey creation."
+                )
+                
+                val verifyCredential =
+                    verifyRegistrationOptions(nonNullCredentialJson)
+                
+                Log.d(
+                    "LoginViewModel",
+                    "Passkey verification result: $verifyCredential"
+                )
+                
+            } catch (pke: PasskeyCreationException) {
+                Log.e(
+                    "LoginViewModel",
+                    "Passkey creation failed: ${pke.message}",
+                    pke
+                )
+            } catch (e: Exception) {
+                Log.e(
+                    "LoginViewModel",
+                    "An unexpected error occurred during passkey creation.",
+                    e
+                )
             }
         }
     }
