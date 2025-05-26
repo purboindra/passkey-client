@@ -19,6 +19,7 @@ import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
 import io.ktor.http.ContentType
+import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,7 +28,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import java.net.HttpCookie
 
 @Serializable
 data class RegistrationResponse(val message: String, val data: OptionsDataClass)
@@ -139,7 +139,7 @@ class LoginViewModel : ViewModel() {
                     setBody(verifyBody)
                 }
             
-            if (httpResponse.status.value != 201) {
+            if (httpResponse.status != HttpStatusCode.Created) {
                 throw Exception(httpResponse.status.description)
             }
             
