@@ -139,8 +139,7 @@ class LoginViewModel : ViewModel() {
                     setBody(verifyBody)
                 }
             
-            
-            if (httpResponse.status.value != 200) {
+            if (httpResponse.status.value != 201) {
                 throw Exception(httpResponse.status.description)
             }
             
