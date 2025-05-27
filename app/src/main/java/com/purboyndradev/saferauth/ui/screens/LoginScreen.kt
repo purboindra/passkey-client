@@ -2,6 +2,7 @@ package com.purboyndradev.saferauth.ui.screens
 
 import android.annotation.SuppressLint
 import android.os.Build
+import android.widget.Toast
 import androidx.activity.compose.LocalActivity
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.layout.Arrangement
@@ -15,6 +16,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -39,9 +41,16 @@ fun LoginScreen(
     val activityContext = LocalActivity.current
     
     val loading by loginViewModel.loading.collectAsState()
+    val errorMessage by loginViewModel.errormEssage.collectAsState()
     
     val appCredentialManager = remember {
         AppCredentialManager(context = context)
+    }
+    
+    LaunchedEffect(errorMessage) {
+        if (errorMessage.isNotBlank()) {
+            Toast.makeText(context, errorMessage, Toast.LENGTH_SHORT).show()
+        }
     }
     
     fun createPasskey(

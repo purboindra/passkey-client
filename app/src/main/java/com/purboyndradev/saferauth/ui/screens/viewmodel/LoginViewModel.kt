@@ -88,6 +88,9 @@ class LoginViewModel : ViewModel() {
     private val _loading = MutableStateFlow(false)
     val loading: StateFlow<Boolean> = _loading.asStateFlow()
     
+    private val _errorMessage = MutableStateFlow("")
+    val errormEssage: StateFlow<String> = _errorMessage.asStateFlow()
+    
     suspend fun fetchRegistrationOptions(): OptionsDataClass? {
         try {
             _loading.value = true
@@ -118,6 +121,7 @@ class LoginViewModel : ViewModel() {
             
         } catch (e: Exception) {
             Log.e("LoginViewModel", "Error fetching registration options", e)
+            _errorMessage.value = e.message.toString()
             return null
         } finally {
             _loading.value = false
@@ -146,7 +150,44 @@ class LoginViewModel : ViewModel() {
             return true
         } catch (e: Throwable) {
             Log.e("LoginViewModel", "Error verifying registration options", e)
+            _errorMessage.value = e.message.toString()
             return false
+        }
+    }
+    
+    suspend fun fetchAuthenticationOptions(): OptionsDataClass? {
+        try {
+            _loading.value = true
+            
+            val httpResponse =
+                client.get(urlString = "$URL/auth/generate-authentication-options") {
+                    url {
+                        parameters.append("email", "johndoe@gmail.com")
+                        parameters.append("username", "johndoe")
+                    }
+                }
+            
+            Log.d(
+                "LoginViewModel",
+                "Authentication options response: $httpResponse"
+            )
+            
+            if (httpResponse.status.value != 200) {
+                Log.e("LoginViewModel", "Error fetching authentication options")
+                throw Exception("Error fetching authentication options")
+            }
+            
+            val response: RegistrationResponse =
+                httpResponse.body()
+            Log.d("LoginViewModel", "Authentication options: $response")
+            
+            return response.data
+            
+        } catch (e: Exception) {
+            Log.e("LoginViewModel", "Error fetching authentication options", e)
+            return null
+        } finally {
+            _loading.value = false
         }
     }
     
@@ -157,6 +198,12 @@ class LoginViewModel : ViewModel() {
         activityContext: Context,
     ) {
         viewModelScope.launch {
+            
+            /// Reset Error Message
+            _errorMessage.value = ""
+            
+            /// Set Loading
+            _loading.value = true
             
             val requestJson = fetchRegistrationOptions();
             
@@ -224,6 +271,8 @@ class LoginViewModel : ViewModel() {
                     "An unexpected error occurred during passkey creation.",
                     e
                 )
+            } finally {
+                _loading.value = false
             }
         }
     }
