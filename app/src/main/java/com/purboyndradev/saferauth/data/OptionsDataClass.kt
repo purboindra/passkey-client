@@ -5,6 +5,7 @@ import kotlinx.serialization.json.JsonArray
 
 @Serializable
 data class OptionsDataClass(
+    val rpId: String = "",
     val challenge: String,
     val rp: Rp,
     val user: User,
@@ -17,3 +18,19 @@ data class OptionsDataClass(
     val hints: JsonArray = JsonArray(emptyList())
 )
 
+@Serializable
+data class AllowCredential(
+    val id: String,
+    val type: String,
+    val transports: List<String>,
+)
+
+@Serializable
+data class AuthenticationOptionsDataClass(
+    val rpId: String,
+    val user: User? = null,
+    val challenge: String,
+    val allowCredentials: List<AllowCredential>,
+    val userVerification: String,
+    val timeout: Long
+)

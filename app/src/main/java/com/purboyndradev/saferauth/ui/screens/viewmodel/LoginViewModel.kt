@@ -3,11 +3,22 @@ package com.purboyndradev.saferauth.ui.screens.viewmodel
 import android.annotation.SuppressLint
 import android.content.Context
 import android.util.Log
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
 import androidx.credentials.CreatePublicKeyCredentialRequest
+import androidx.credentials.CustomCredential
+import androidx.credentials.GetCredentialRequest
+import androidx.credentials.GetCredentialResponse
+import androidx.credentials.GetPasswordOption
+import androidx.credentials.GetPublicKeyCredentialOption
+import androidx.credentials.PasswordCredential
+import androidx.credentials.PublicKeyCredential
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.purboyndradev.saferauth.data.AppCredentialManager
+import com.purboyndradev.saferauth.data.AuthenticationOptionsDataClass
 import com.purboyndradev.saferauth.data.OptionsDataClass
+import com.purboyndradev.saferauth.data.User
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.cio.CIO
@@ -18,6 +29,7 @@ import io.ktor.client.request.get
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
@@ -31,6 +43,12 @@ import kotlinx.serialization.json.Json
 
 @Serializable
 data class RegistrationResponse(val message: String, val data: OptionsDataClass)
+
+@Serializable
+data class AuthenticationResponse(
+    val message: String,
+    val data: AuthenticationOptionsDataClass
+)
 
 @Serializable
 data class UserResponse(val name: String, val age: Int)
@@ -91,6 +109,22 @@ class LoginViewModel : ViewModel() {
     private val _errorMessage = MutableStateFlow("")
     val errormEssage: StateFlow<String> = _errorMessage.asStateFlow()
     
+    private val _email = MutableStateFlow("")
+    val email: StateFlow<String> = _email.asStateFlow()
+    
+    fun onEmailChange(email: String) {
+        _email.value = email
+    }
+    
+    val emailHasErrors by derivedStateOf {
+        if (_email.value.isNotEmpty()) {
+            // Email is considered erroneous until it completely matches EMAIL_ADDRESS.
+            !android.util.Patterns.EMAIL_ADDRESS.matcher(_email.value).matches()
+        } else {
+            false
+        }
+    }
+    
     suspend fun fetchRegistrationOptions(): OptionsDataClass? {
         try {
             _loading.value = true
@@ -98,8 +132,7 @@ class LoginViewModel : ViewModel() {
             val httpResponse =
                 client.get(urlString = "$URL/auth/generate-registration-options") {
                     url {
-                        parameters.append("email", "johndoe@gmail.com")
-                        parameters.append("username", "johndoe")
+                        parameters.append("email", _email.value)
                     }
                 }
             
@@ -155,21 +188,21 @@ class LoginViewModel : ViewModel() {
         }
     }
     
-    suspend fun fetchAuthenticationOptions(): OptionsDataClass? {
+    suspend fun fetchAuthenticationOptions(): AuthenticationOptionsDataClass? {
         try {
             _loading.value = true
             
             val httpResponse =
                 client.get(urlString = "$URL/auth/generate-authentication-options") {
                     url {
-                        parameters.append("email", "johndoe@gmail.com")
-                        parameters.append("username", "johndoe")
+                        /// TODO: Get from local storage
+                        parameters.append("email", _email.value)
                     }
                 }
             
             Log.d(
                 "LoginViewModel",
-                "Authentication options response: $httpResponse"
+                "Authentication options response: ${httpResponse.bodyAsText()}"
             )
             
             if (httpResponse.status.value != 200) {
@@ -177,7 +210,7 @@ class LoginViewModel : ViewModel() {
                 throw Exception("Error fetching authentication options")
             }
             
-            val response: RegistrationResponse =
+            val response: AuthenticationResponse =
                 httpResponse.body()
             Log.d("LoginViewModel", "Authentication options: $response")
             
@@ -186,8 +219,93 @@ class LoginViewModel : ViewModel() {
         } catch (e: Exception) {
             Log.e("LoginViewModel", "Error fetching authentication options", e)
             return null
-        } finally {
-            _loading.value = false
+        }
+    }
+    
+    @SuppressLint("PublicKeyCredential")
+    fun loginWithPasskey(
+        appCredentialManager: AppCredentialManager,
+        activityContext: Context,
+    ) {
+        viewModelScope.launch {
+            try {
+                /// Reset Error Message
+                _errorMessage.value = ""
+                
+                /// Set Loading
+                _loading.value = true
+                
+                val loginJson = fetchAuthenticationOptions();
+                
+                if (loginJson == null) {
+                    throw Exception("Error fetching authentication options, loginJson is null")
+                }
+                
+                val modifyJson = loginJson.copy(
+                    user = User(
+                        name = _email.value.split("@")[0],
+                        id = "",
+                        displayName = _email.value.split("@")[0],
+                    )
+                )
+                
+                val getPublicKeyCredentialOption = GetPublicKeyCredentialOption(
+                    requestJson = Json.encodeToString(modifyJson)
+                )
+                
+                val getPasswordOption = GetPasswordOption()
+                
+                val getCredRequest = GetCredentialRequest(
+                    listOf(getPasswordOption, getPublicKeyCredentialOption)
+                )
+                
+                val result =
+                    appCredentialManager.credentialManager.getCredential(
+                        context = activityContext,
+                        request = getCredRequest
+                    )
+                
+                handleSignIn(result)
+                
+            } catch (e: Throwable) {
+                Log.e(
+                    "LoginViewModel",
+                    "Error verifying registration options",
+                    e
+                )
+                _errorMessage.value = e.message.toString()
+            } finally {
+                _loading.value = false
+            }
+        }
+    }
+    
+    fun handleSignIn(result: GetCredentialResponse) {
+        // Handle the successfully returned credential.
+        val credential = result.credential
+        
+        when (credential) {
+            is PublicKeyCredential -> {
+                val responseJson = credential.authenticationResponseJson
+                // Share responseJson i.e. a GetCredentialResponse on your server to
+                // validate and  authenticate
+                Log.d("LoginViewModel", "Response: $responseJson")
+            }
+            
+            is PasswordCredential -> {
+                val username = credential.id
+                val password = credential.password
+                // Share username and password i.e. a GetCredentialResponse on your server to
+                // validate and  authenticate
+                Log.d(
+                    "LoginViewModel",
+                    "Username: $username, Password: $password"
+                )
+            }
+            
+            else -> {
+                Log.e("LoginViewModel", "Unexpected type of credential")
+            }
         }
     }
     
@@ -213,19 +331,19 @@ class LoginViewModel : ViewModel() {
             }
             
             Log.d("LoginViewModel", "Registration options: $requestJson")
-            
-            val modifyJson =
-                requestJson.copy(user = requestJson.user.copy(name = "john doe"))
+
+//            val modifyJson =
+//                requestJson.copy(user = requestJson.user.copy(name = "john doe"))
             
             val createPublicKeyCredentialRequest =
                 CreatePublicKeyCredentialRequest(
-                    requestJson = Json.encodeToString(modifyJson),
+                    requestJson = Json.encodeToString(requestJson),
                     preferImmediatelyAvailableCredentials = preferImmediatelyAvailableCredentials
                 )
             
             Log.d(
                 "LoginViewModel",
-                "Creating passkey with request: $createPublicKeyCredentialRequest, modifyJson: $modifyJson"
+                "Creating passkey with request: $createPublicKeyCredentialRequest"
             )
             
             try {
