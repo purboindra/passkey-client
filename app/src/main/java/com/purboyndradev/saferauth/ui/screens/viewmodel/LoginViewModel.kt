@@ -2,11 +2,14 @@ package com.purboyndradev.saferauth.ui.screens.viewmodel
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.os.Build
 import android.util.Log
+import androidx.annotation.RequiresApi
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.credentials.CreateCredentialRequest
+import androidx.credentials.CreateCredentialResponse
 import androidx.credentials.CreatePublicKeyCredentialRequest
-import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.GetCredentialResponse
 import androidx.credentials.GetPasswordOption
@@ -136,21 +139,17 @@ class LoginViewModel : ViewModel() {
                     }
                 }
             
-            Log.d(
-                "LoginViewModel",
-                "Registration options response: $httpResponse"
-            )
-            
             if (httpResponse.status.value != 200) {
-                Log.e("LoginViewModel", "Error fetching registration options")
                 throw Exception("Error fetching registration options")
             }
             
-            val response: RegistrationResponse =
-                httpResponse.body()
-            Log.d("LoginViewModel", "Registration options: $response")
+            val response =
+                httpResponse.bodyAsText()
             
-            return response.data
+            val decodeResponse =
+                Json.decodeFromString<RegistrationResponse>(response)
+            
+            return decodeResponse.data
             
         } catch (e: Exception) {
             Log.e("LoginViewModel", "Error fetching registration options", e)
@@ -164,11 +163,11 @@ class LoginViewModel : ViewModel() {
     suspend fun verifyRegistrationOptions(body: String): Boolean {
         try {
             
-            Log.d("LoginViewModel", "Verifying registration options: $body")
+            val json = Json {
+                ignoreUnknownKeys = true
+            }
             
-            val verifyBody = Json.decodeFromString<VerifyBody>(body)
-            
-            Log.d("LoginViewModel", "Verify body: $verifyBody")
+            val verifyBody = json.decodeFromString<VerifyBody>(body)
             
             val httpResponse: HttpResponse =
                 client.post("$URL/auth/verify-registration-options") {
@@ -309,6 +308,7 @@ class LoginViewModel : ViewModel() {
         }
     }
     
+    @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
     @SuppressLint("PublicKeyCredential")
     fun createPasskey(
         preferImmediatelyAvailableCredentials: Boolean,
@@ -323,75 +323,240 @@ class LoginViewModel : ViewModel() {
             /// Set Loading
             _loading.value = true
             
-            val requestJson = fetchRegistrationOptions();
+            val responseRegistrationOptions = fetchRegistrationOptions();
             
-            if (requestJson == null) {
-                Log.e("LoginViewModel", "Error fetching registration options")
-                return@launch
+            responseRegistrationOptions?.let {
+                Log.d("LoginViewModel", "Registration options: $it")
+                
+                val jsonForPasskey = Json {
+                    encodeDefaults = true
+                    prettyPrint = true
+                    isLenient = true
+                }
+                
+                val requestJson =
+                    jsonForPasskey.encodeToString(responseRegistrationOptions)
+                
+                val createPublicKeyCredentialRequest =
+                    CreatePublicKeyCredentialRequest(
+                        requestJson = requestJson,
+                        preferImmediatelyAvailableCredentials = preferImmediatelyAvailableCredentials
+                    )
+                
+                Log.d(
+                    "LoginViewModel",
+                    "Creating passkey with request: $createPublicKeyCredentialRequest"
+                )
+                
+                try {
+                    
+                    registerPasskey(
+                        appCredentialManager = appCredentialManager,
+                        activityContext = activityContext,
+                        request = createPublicKeyCredentialRequest
+                    ) { result ->
+                        if (result != null) {
+                            try {
+                                val registrationResponseJsonKey =
+                                    "androidx.credentials.BUNDLE_KEY_REGISTRATION_RESPONSE_JSON"
+                                
+                                val bundle = result.data
+                                
+                                val credentialJson =
+                                    bundle.getString(registrationResponseJsonKey)
+                                
+                                credentialJson?.let {
+                                    viewModelScope.launch {
+                                        val verified =
+                                            verifyRegistrationOptions(
+                                                it,
+                                            )
+                                        
+                                        if (verified) {
+                                            Log.d(
+                                                "LoginViewModel",
+                                                "Passkey verified"
+                                            )
+                                        } else {
+                                            Log.e(
+                                                "LoginViewModel",
+                                                "Passkey verification failed"
+                                            )
+                                        }
+                                    }
+                                }
+                            } catch (e: PasskeyCreationException) {
+                                Log.e(
+                                    "LoginViewModel",
+                                    "Error verifying registration options while creating passkey",
+                                    e
+                                )
+                                _errorMessage.value = e.message.toString()
+                            } catch (e: Exception) {
+                                Log.e(
+                                    "LoginViewModel",
+                                    "Error verifying registration options",
+                                    e
+                                )
+                                _errorMessage.value = e.message.toString()
+                            }
+                            
+                        }
+                        
+                    }
+
+//                    registerPassword(
+//                        username = _email.value.split("@")[0],
+//                        password = "qwerty123",
+//                        appCredentialManager = appCredentialManager,
+//                        activityContext = activityContext,
+//                        request = createPublicKeyCredentialRequest
+//                    ) { result ->
+//                        if (result != null) {
+//                            try {
+//
+//                                Log.d(
+//                                    "LoginViewModel",
+//                                    "Result: ${result.data}"
+//                                )
+//
+//                                val registrationResponseJsonKey =
+//                                    "androidx.credentials.BUNDLE_KEY_REGISTRATION_RESPONSE_JSON"
+//
+//                                val bundle = result.data
+//
+//                                val credentialJson =
+//                                    bundle.getString(registrationResponseJsonKey)
+//
+//                                Log.d(
+//                                    "LoginViewModel",
+//                                    "Credential JSON: $credentialJson"
+//                                )
+//
+////
+////                            val nonNullCredentialJson = credentialJson
+////                                ?: throw PasskeyCreationException("Credential JSON is null, cannot proceed with passkey creation")
+//
+//                                credentialJson?.let {
+//                                    viewModelScope.launch {
+//                                        val verified =
+//                                            verifyRegistrationOptions(
+//                                                it,
+//                                            )
+//
+//                                        if (verified) {
+//                                            Log.d(
+//                                                "LoginViewModel",
+//                                                "Passkey verified"
+//                                            )
+//                                        } else {
+//                                            Log.e(
+//                                                "LoginViewModel",
+//                                                "Passkey verification failed"
+//                                            )
+//                                        }
+//                                    }
+//                                }
+//                            } catch (e: PasskeyCreationException) {
+//                                Log.e(
+//                                    "LoginViewModel",
+//                                    "Error verifying registration options while creating passkey",
+//                                    e
+//                                )
+//                                _errorMessage.value = e.message.toString()
+//                            } catch (e: Exception) {
+//                                Log.e(
+//                                    "LoginViewModel",
+//                                    "Error verifying registration options",
+//                                    e
+//                                )
+//                                _errorMessage.value = e.message.toString()
+//                            }
+//
+//                        }
+//
+//                    }
+                    
+                } catch (pke: PasskeyCreationException) {
+                    Log.e(
+                        "LoginViewModel",
+                        "Passkey creation failed: ${pke.message}",
+                        pke
+                    )
+                } catch (e: Exception) {
+                    Log.e(
+                        "LoginViewModel",
+                        "An unexpected error occurred during passkey creation.",
+                        e
+                    )
+                } finally {
+                    _loading.value = false
+                }
             }
             
-            Log.d("LoginViewModel", "Registration options: $requestJson")
-
-//            val modifyJson =
-//                requestJson.copy(user = requestJson.user.copy(name = "john doe"))
             
-            val createPublicKeyCredentialRequest =
-                CreatePublicKeyCredentialRequest(
-                    requestJson = Json.encodeToString(requestJson),
-                    preferImmediatelyAvailableCredentials = preferImmediatelyAvailableCredentials
+        }
+    }
+    
+    suspend fun registerPasskey(
+        appCredentialManager: AppCredentialManager,
+        activityContext: Context,
+        request: CreateCredentialRequest,
+        onResult: (CreateCredentialResponse?) -> Unit
+    ) {
+        try {
+            val result =
+                appCredentialManager.credentialManager.createCredential(
+                    activityContext,
+                    request,
                 )
             
-            Log.d(
-                "LoginViewModel",
-                "Creating passkey with request: $createPublicKeyCredentialRequest"
-            )
+            onResult(result)
             
+        } catch (e: Exception) {
+            Log.e("LoginViewModel", "Error registering passkey", e)
+            onResult(null)
+        }
+    }
+    
+    @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+    fun registerPassword(
+        username: String,
+        password: String,
+        appCredentialManager: AppCredentialManager,
+        activityContext: Context,
+        request: CreateCredentialRequest,
+        onResult: (CreateCredentialResponse?) -> Unit,
+    ) {
+        /// CreatePasswordRequest for save password credential
+//        val result =
+//            appCredentialManager.credentialManager.createCredential(
+//                activityContext,
+//                request
+//            )
+        
+        viewModelScope.launch {
             try {
                 val result =
                     appCredentialManager.credentialManager.createCredential(
-                        context = activityContext,
-                        request = createPublicKeyCredentialRequest
+                        activityContext,
+                        request,
                     )
-                
-                val credentialJson =
-                    result.data.getString("androidx.credentials.BUNDLE_KEY_REGISTRATION_RESPONSE_JSON")
-                
+                Log.d("LoginViewModel", "Credential type: ${result.type}")
                 Log.d(
                     "LoginViewModel",
-                    "Passkey created credentialJson: $credentialJson"
+                    "Credential data bundle: ${result.data}"
                 )
-                
-                val nonNullCredentialJson = credentialJson
-                    ?: throw PasskeyCreationException("Credential JSON is null, cannot proceed with passkey creation")
-                
-                Log.d(
-                    "LoginViewModel",
-                    "Successfully obtained credential JSON, proceeding with passkey creation."
-                )
-                
-                val verifyCredential =
-                    verifyRegistrationOptions(nonNullCredentialJson)
-                
-                Log.d(
-                    "LoginViewModel",
-                    "Passkey verification result: $verifyCredential"
-                )
-                
-            } catch (pke: PasskeyCreationException) {
+                onResult(result)
+            } catch (e: androidx.credentials.exceptions.CreateCredentialException) {
                 Log.e(
                     "LoginViewModel",
-                    "Passkey creation failed: ${pke.message}",
-                    pke
+                    "Error creating password credential: $e"
                 )
-            } catch (e: Exception) {
-                Log.e(
-                    "LoginViewModel",
-                    "An unexpected error occurred during passkey creation.",
-                    e
-                )
-            } finally {
-                _loading.value = false
+                onResult(null)
             }
         }
     }
+    
+    
 }

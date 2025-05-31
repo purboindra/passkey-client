@@ -57,15 +57,6 @@ fun LoginScreen(
         }
     }
     
-    fun createPasskey(
-    ) {
-        loginViewModel.createPasskey(
-            preferImmediatelyAvailableCredentials = false,
-            appCredentialManager = appCredentialManager,
-            activityContext = activityContext!!.applicationContext
-        )
-    }
-    
     fun loginWithPasskey() {
         loginViewModel.loginWithPasskey(
             appCredentialManager = appCredentialManager,
@@ -110,7 +101,11 @@ fun LoginScreen(
                 Spacer(Modifier.height(12.dp))
                 ElevatedButton(
                     onClick = {
-                        createPasskey()
+                        loginViewModel.createPasskey(
+                            preferImmediatelyAvailableCredentials = false,
+                            appCredentialManager = appCredentialManager,
+                            activityContext = activityContext!!.applicationContext
+                        )
                     },
                 ) {
                     Text(
