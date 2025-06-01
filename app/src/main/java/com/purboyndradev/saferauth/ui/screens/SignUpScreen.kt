@@ -5,9 +5,6 @@ import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.LocalActivity
 import androidx.annotation.RequiresApi
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -20,8 +17,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.ElevatedButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -35,24 +30,21 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavController
 import com.purboyndradev.saferauth.data.AppCredentialManager
 import com.purboyndradev.saferauth.ui.MyIconPack
 import com.purboyndradev.saferauth.ui.myiconpack.IconPasskey
+import com.purboyndradev.saferauth.ui.navigation.SignInOptions
 import com.purboyndradev.saferauth.ui.screens.viewmodel.LoginViewModel
 
 private const val TAG = "LoginScreen"
@@ -60,8 +52,9 @@ private const val TAG = "LoginScreen"
 @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
 @SuppressLint("PublicKeyCredential")
 @Composable
-fun LoginScreen(
-    loginViewModel: LoginViewModel = LoginViewModel()
+fun SignUpScreen(
+    loginViewModel: LoginViewModel = LoginViewModel(),
+    navController: NavController
 ) {
     val context = LocalContext.current
     val activityContext = LocalActivity.current
@@ -128,7 +121,7 @@ fun LoginScreen(
                     color = Color.Gray.copy(alpha = 0.1f),
                     shape = RoundedCornerShape(8.dp)
                 ) {
-                    SigningInContent()
+                    SigningInContent(navController)
                 }
                 Spacer(modifier = Modifier.height(12.dp))
                 ElevatedButton(
@@ -149,7 +142,7 @@ fun LoginScreen(
 }
 
 @Composable
-fun SigningInContent() {
+fun SigningInContent(navController: NavController) {
     val annotatedString = buildAnnotatedString {
         append("Passkey is a faster and safer way to sign in than a password. Your account is created with one unless you choose another option. ")
         withStyle(
@@ -174,7 +167,9 @@ fun SigningInContent() {
             )
         }
         TextButton(
-            onClick = {},
+            onClick = {
+                navController.navigate(SignInOptions)
+            },
             contentPadding = PaddingValues(0.dp)
         ) {
             Text(
