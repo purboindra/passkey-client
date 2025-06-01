@@ -8,6 +8,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.purboyndradev.saferauth.ui.screens.MainScreen
 import com.purboyndradev.saferauth.ui.screens.OtherSignInOptionsScreen
 import com.purboyndradev.saferauth.ui.screens.PasskeyInformationScreen
 import com.purboyndradev.saferauth.ui.screens.SignUpScreen
@@ -21,6 +22,9 @@ object SignInOptions
 
 @Serializable
 object PasskeyInformation
+
+@Serializable
+object MainScreen
 
 @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
 @Composable
@@ -45,6 +49,11 @@ fun MyAppNavHost(
         }
         composable<PasskeyInformation> {
             PasskeyInformationScreen(
+                navController = navController
+            )
+        }
+        composable<MainScreen> {
+            MainScreen(
                 navController = navController
             )
         }
