@@ -134,7 +134,10 @@ fun SignUpScreen(
                             onNavigate = { result ->
                                 navController.navigate(
                                    "main_screen/${email}",
-                                )
+                                ) {
+                                    popUpTo(0)
+                                    launchSingleTop = true
+                                }
                             }
                         )
                     },
