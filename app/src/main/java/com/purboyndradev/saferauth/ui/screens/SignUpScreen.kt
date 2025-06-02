@@ -41,6 +41,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import androidx.navigation.NavOptions
 import com.purboyndradev.saferauth.data.AppCredentialManager
 import com.purboyndradev.saferauth.ui.MyIconPack
 import com.purboyndradev.saferauth.ui.myiconpack.IconPasskey
@@ -129,7 +130,12 @@ fun SignUpScreen(
                         loginViewModel.createPasskey(
                             false,
                             appCredentialManager = appCredentialManager,
-                            context
+                            context,
+                            onNavigate = { result ->
+                                navController.navigate(
+                                   "main_screen/${email}",
+                                )
+                            }
                         )
                     },
                     modifier = Modifier.fillMaxWidth()

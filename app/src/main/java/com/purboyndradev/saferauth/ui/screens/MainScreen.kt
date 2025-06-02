@@ -1,18 +1,27 @@
 package com.purboyndradev.saferauth.ui.screens
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavController
 
 @Composable
-fun MainScreen(navController: NavController) {
+fun MainScreen(navController: NavController, email: String) {
     Scaffold { paddingValues ->
-        Column(modifier = Modifier.padding(paddingValues)) {
-            Text("Hello")
+        Column(
+            modifier = Modifier
+                .padding(paddingValues)
+                .fillMaxSize(),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text("Hello: ${email}")
         }
     }
 }

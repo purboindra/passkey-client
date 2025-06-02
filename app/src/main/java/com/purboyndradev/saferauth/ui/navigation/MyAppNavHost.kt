@@ -52,9 +52,11 @@ fun MyAppNavHost(
                 navController = navController
             )
         }
-        composable<MainScreen> {
+        composable(route = "main_screen/{email}") { navBackStackEntry ->
+            val email = navBackStackEntry.arguments?.getString("email")
             MainScreen(
-                navController = navController
+                navController = navController,
+                email = email ?: "No User"
             )
         }
     }

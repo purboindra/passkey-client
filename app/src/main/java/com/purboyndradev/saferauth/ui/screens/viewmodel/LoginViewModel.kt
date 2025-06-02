@@ -5,6 +5,7 @@ import android.content.Context
 import android.os.Build
 import android.util.Log
 import androidx.annotation.RequiresApi
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.credentials.CreateCredentialRequest
@@ -316,6 +317,7 @@ class LoginViewModel : ViewModel() {
         preferImmediatelyAvailableCredentials: Boolean,
         appCredentialManager: AppCredentialManager,
         activityContext: Context,
+        onNavigate: (String) -> Unit
     ) {
         viewModelScope.launch {
             
@@ -379,6 +381,10 @@ class LoginViewModel : ViewModel() {
                                             "LoginViewModel",
                                             "Passkey verified"
                                         )
+                                        
+                                        /// Navigate to home screen
+                                        onNavigate(_email.value)
+                                        
                                     } else {
                                         Log.e(
                                             "LoginViewModel",
