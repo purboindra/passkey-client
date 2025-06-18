@@ -21,7 +21,7 @@ fun MainScreen(navController: NavController, email: String) {
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text("Hello: ${email}")
+            Text("Hello: $email")
         }
     }
 }

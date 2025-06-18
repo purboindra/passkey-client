@@ -5,12 +5,12 @@ import android.content.Context
 import android.os.Build
 import android.util.Log
 import androidx.annotation.RequiresApi
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.credentials.CreateCredentialRequest
 import androidx.credentials.CreateCredentialResponse
 import androidx.credentials.CreatePublicKeyCredentialRequest
+import androidx.credentials.CredentialOption
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.GetCredentialResponse
 import androidx.credentials.GetPasswordOption
@@ -111,7 +111,7 @@ class LoginViewModel : ViewModel() {
     val loading: StateFlow<Boolean> = _loading.asStateFlow()
     
     private val _errorMessage = MutableStateFlow("")
-    val errormEssage: StateFlow<String> = _errorMessage.asStateFlow()
+    val errorMessage: StateFlow<String> = _errorMessage.asStateFlow()
     
     private val _email = MutableStateFlow("")
     val email: StateFlow<String> = _email.asStateFlow()
@@ -165,11 +165,9 @@ class LoginViewModel : ViewModel() {
     
     suspend fun verifyRegistrationOptions(body: String): Boolean {
         try {
-            
             val json = Json {
                 ignoreUnknownKeys = true
             }
-            
             val verifyBody = json.decodeFromString<VerifyBody>(body)
             
             val httpResponse: HttpResponse =
@@ -224,6 +222,31 @@ class LoginViewModel : ViewModel() {
         }
     }
     
+    suspend fun verifyAuthenticationOptions(body: String): Boolean {
+        try {
+            val json = Json {
+                ignoreUnknownKeys = true
+            }
+            val verifyBody = json.decodeFromString<VerifyBody>(body)
+            
+            val httpResponse: HttpResponse =
+                client.post("$URL/auth/verify-authentication-options") {
+                    contentType(ContentType.Application.Json)
+                    setBody(verifyBody)
+                }
+            
+            if (httpResponse.status != HttpStatusCode.Created) {
+                throw Exception(httpResponse.status.description)
+            }
+            
+            return true
+        } catch (e: Throwable) {
+            Log.e("LoginViewModel", "Error verifying registration options", e)
+            _errorMessage.value = e.message.toString()
+            return false
+        }
+    }
+    
     @SuppressLint("PublicKeyCredential")
     fun loginWithPasskey(
         appCredentialManager: AppCredentialManager,
@@ -237,29 +260,25 @@ class LoginViewModel : ViewModel() {
                 /// Set Loading
                 _loading.value = true
                 
-                val loginJson = fetchAuthenticationOptions();
+                val getPasswordOption = GetPasswordOption()
                 
-                if (loginJson == null) {
+                Log.d("LoginViewModel", "getPasswordOption: $getPasswordOption")
+                
+                val requestOptionsJsonString = fetchAuthenticationOptions();
+                
+                if (requestOptionsJsonString == null) {
                     throw Exception("Error fetching authentication options, loginJson is null")
                 }
                 
-                val modifyJson = loginJson.copy(
-                    user = User(
-                        name = _email.value.split("@")[0],
-                        id = "",
-                        displayName = _email.value.split("@")[0],
-                    )
-                )
-                
                 val getPublicKeyCredentialOption = GetPublicKeyCredentialOption(
-                    requestJson = Json.encodeToString(modifyJson)
+                    requestJson = Json.encodeToString(requestOptionsJsonString)
                 )
                 
-                val getPasswordOption = GetPasswordOption()
+                val credentialOptions = mutableListOf<CredentialOption>()
+                credentialOptions.add(getPublicKeyCredentialOption)
+                credentialOptions.add(GetPasswordOption())
                 
-                val getCredRequest = GetCredentialRequest(
-                    listOf(getPasswordOption, getPublicKeyCredentialOption)
-                )
+                val getCredRequest = GetCredentialRequest(credentialOptions)
                 
                 val result =
                     appCredentialManager.credentialManager.getCredential(
@@ -282,7 +301,7 @@ class LoginViewModel : ViewModel() {
         }
     }
     
-    fun handleSignIn(result: GetCredentialResponse) {
+    suspend fun handleSignIn(result: GetCredentialResponse) {
         // Handle the successfully returned credential.
         val credential = result.credential
         
@@ -292,6 +311,14 @@ class LoginViewModel : ViewModel() {
                 // Share responseJson i.e. a GetCredentialResponse on your server to
                 // validate and  authenticate
                 Log.d("LoginViewModel", "Response: $responseJson")
+                
+                val response = verifyAuthenticationOptions(responseJson)
+                
+                if (response) {
+                    Log.d("LoginViewModel", "Authentication successful")
+                } else {
+                    Log.d("LoginViewModel", "Authentication failed")
+                }
             }
             
             is PasswordCredential -> {
@@ -324,20 +351,15 @@ class LoginViewModel : ViewModel() {
             /// Set Loading
             _loading.value = true
             
+            setEmptyErrorMessage()
+            
             try {
                 val responseRegistrationOptions = fetchRegistrationOptions();
                 
+                /// TODO: Condition for return error message
                 responseRegistrationOptions?.let {
-                    Log.d("LoginViewModel", "Registration options: $it")
-                    
-                    val jsonForPasskey = Json {
-                        encodeDefaults = true
-                        prettyPrint = true
-                        isLenient = true
-                    }
-                    
                     val requestJson =
-                        jsonForPasskey.encodeToString(
+                        Json.encodeToString(
                             responseRegistrationOptions
                         )
                     
@@ -346,12 +368,6 @@ class LoginViewModel : ViewModel() {
                             requestJson = requestJson,
                             preferImmediatelyAvailableCredentials = preferImmediatelyAvailableCredentials
                         )
-                    
-                    Log.d(
-                        "LoginViewModel",
-                        "Creating passkey with request: $createPublicKeyCredentialRequest"
-                    )
-                    
                     
                     registerPasskey(
                         appCredentialManager = appCredentialManager,
@@ -377,15 +393,10 @@ class LoginViewModel : ViewModel() {
                                         )
                                     
                                     if (verified) {
-                                        Log.d(
-                                            "LoginViewModel",
-                                            "Passkey verified"
-                                        )
-                                        
                                         /// Navigate to home screen
                                         onNavigate(_email.value)
-                                        
                                     } else {
+                                        /// TODO: Handle error
                                         Log.e(
                                             "LoginViewModel",
                                             "Passkey verification failed"

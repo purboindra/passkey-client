@@ -41,7 +41,6 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import androidx.navigation.NavOptions
 import com.purboyndradev.saferauth.data.AppCredentialManager
 import com.purboyndradev.saferauth.ui.MyIconPack
 import com.purboyndradev.saferauth.ui.myiconpack.IconPasskey
@@ -61,7 +60,7 @@ fun SignUpScreen(
     val activityContext = LocalActivity.current
     
     val loading by loginViewModel.loading.collectAsState()
-    val errorMessage by loginViewModel.errormEssage.collectAsState()
+    val errorMessage by loginViewModel.errorMessage.collectAsState()
     val email by loginViewModel.email.collectAsState()
     
     val appCredentialManager = remember {
@@ -123,6 +122,18 @@ fun SignUpScreen(
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     SigningInContent(navController)
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                ElevatedButton(
+                    onClick = {
+                       loginViewModel.loginWithPasskey(
+                           appCredentialManager = appCredentialManager,
+                           activityContext = activityContext!!.applicationContext
+                       )
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(if (loading) "Loading..." else "Sign In")
                 }
                 Spacer(modifier = Modifier.height(12.dp))
                 ElevatedButton(

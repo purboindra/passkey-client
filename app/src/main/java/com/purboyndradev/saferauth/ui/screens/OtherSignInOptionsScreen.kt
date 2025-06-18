@@ -28,6 +28,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.LinkAnnotation
@@ -41,6 +43,7 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import com.purboyndradev.saferauth.ui.MyIconPack
+import com.purboyndradev.saferauth.ui.components.UnavailableDialog
 import com.purboyndradev.saferauth.ui.myiconpack.IconPasskey
 import com.purboyndradev.saferauth.ui.navigation.PasskeyInformation
 import com.purboyndradev.saferauth.ui.navigation.SignInOptions
@@ -50,8 +53,24 @@ import com.purboyndradev.saferauth.ui.navigation.SignInOptions
 fun OtherSignInOptionsScreen(
     navController: NavController
 ) {
+    
+    val openAlertDialog = remember { mutableStateOf(false) }
+    
     fun onNavigateBack() {
         navController.popBackStack()
+    }
+    
+    when {
+        openAlertDialog.value -> UnavailableDialog(
+            onConfirmation = {
+                openAlertDialog.value = false
+            },
+            onDismissRequest = {
+                openAlertDialog.value = false
+            },
+            dialogText = "Sign up with password is not available yet",
+            dialogTitle = "Sorry"
+        )
     }
     
     Scaffold(
@@ -89,7 +108,9 @@ fun OtherSignInOptionsScreen(
                 fontWeight = FontWeight.Bold
             )
             Spacer(modifier = Modifier.height(24.dp))
-            OutlinedButton(onClick = {}, modifier = Modifier.fillMaxWidth()) {
+            OutlinedButton(onClick = {
+                openAlertDialog.value = true
+            }, modifier = Modifier.fillMaxWidth()) {
                 Text("Sign Up With Password")
             }
             Spacer(modifier = Modifier.height(24.dp))
