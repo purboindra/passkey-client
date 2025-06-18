@@ -218,6 +218,7 @@ class LoginViewModel : ViewModel() {
             
         } catch (e: Exception) {
             Log.e("LoginViewModel", "Error fetching authentication options", e)
+            _errorMessage.value = e.message?:"Unknown error"
             return null
         }
     }
