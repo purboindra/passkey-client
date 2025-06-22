@@ -2,6 +2,7 @@ package com.purboyndradev.saferauth.ui.screens
 
 import android.annotation.SuppressLint
 import android.os.Build
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.LocalActivity
 import androidx.annotation.RequiresApi
@@ -45,7 +46,7 @@ import com.purboyndradev.saferauth.data.AppCredentialManager
 import com.purboyndradev.saferauth.ui.MyIconPack
 import com.purboyndradev.saferauth.ui.myiconpack.IconPasskey
 import com.purboyndradev.saferauth.ui.navigation.SignInOptions
-import com.purboyndradev.saferauth.ui.screens.viewmodel.LoginViewModel
+import com.purboyndradev.saferauth.ui.screens.viewmodel.AuthViewModel
 
 private const val TAG = "LoginScreen"
 
@@ -53,7 +54,7 @@ private const val TAG = "LoginScreen"
 @SuppressLint("PublicKeyCredential")
 @Composable
 fun SignUpScreen(
-    loginViewModel: LoginViewModel = LoginViewModel(),
+    loginViewModel: AuthViewModel = AuthViewModel(),
     navController: NavController
 ) {
     val context = LocalContext.current
@@ -61,24 +62,19 @@ fun SignUpScreen(
     
     val loading by loginViewModel.loading.collectAsState()
     val errorMessage by loginViewModel.errorMessage.collectAsState()
+    val errorTriggerId by loginViewModel.errorTriggerId.collectAsState()
     val email by loginViewModel.email.collectAsState()
     
     val appCredentialManager = remember {
         AppCredentialManager(context = context)
     }
     
-    LaunchedEffect(errorMessage) {
+    LaunchedEffect(errorTriggerId) {
         if (errorMessage.isNotBlank()) {
             Toast.makeText(context, errorMessage, Toast.LENGTH_SHORT).show()
+            Log.d("AuthScreen", "Error message: $errorMessage")
             loginViewModel.setEmptyErrorMessage()
         }
-    }
-    
-    fun loginWithPasskey() {
-        loginViewModel.loginWithPasskey(
-            appCredentialManager = appCredentialManager,
-            activityContext = activityContext!!.applicationContext
-        )
     }
     
     Scaffold { paddingValues ->
@@ -126,10 +122,18 @@ fun SignUpScreen(
                 Spacer(modifier = Modifier.height(12.dp))
                 ElevatedButton(
                     onClick = {
-                       loginViewModel.loginWithPasskey(
-                           appCredentialManager = appCredentialManager,
-                           activityContext = activityContext!!.applicationContext
-                       )
+                        loginViewModel.loginWithPasskey(
+                            appCredentialManager = appCredentialManager,
+                            activityContext = activityContext!!.applicationContext,
+                            onNavigate = {
+                                navController.navigate(
+                                    "main_screen/${email}",
+                                ) {
+                                    popUpTo(0)
+                                    launchSingleTop = true
+                                }
+                            }
+                        )
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -144,7 +148,7 @@ fun SignUpScreen(
                             context,
                             onNavigate = { result ->
                                 navController.navigate(
-                                   "main_screen/${email}",
+                                    "main_screen/${email}",
                                 ) {
                                     popUpTo(0)
                                     launchSingleTop = true
